@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Search Playground</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d0d11;
+  --s1: #15151b;
+  --s2: #1c1c24;
+  --s3: #23232e;
+  --bd: #2c2c3a;
+  --bd2: #3a3a4d;
+  --t1: #f0f0f8;
+  --t2: #9898b0;
+  --t3: #58586a;
+  --a: #7c6df7;
+  --a2: #9d91f8;
+  --ah: rgba(124,109,247,0.13);
+  --err: #f45060;
+  --ok: #34c97e;
+  --r: 15px;
+  --rs: 10px;
+  --rx: 7px;
+}
+
+html { height: 100%; }
+body {
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--t1);
+  font: 400 15px/1.55 -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+#app { min-height: 100dvh; display: flex; flex-direction: column; }
+
+/* ── Auth ── */
+.auth-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.auth-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 36px 0 28px;
+}
+
+.dot {
+  border-radius: 50%;
+  background: var(--a);
+}
+.dot:nth-child(1) { width: 7px; height: 7px; opacity: .7; }
+.dot:nth-child(2) { width: 12px; height: 12px; }
+.dot:nth-child(3) { width: 7px; height: 7px; opacity: .5; background: var(--t3); }
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--bd);
+}
+
+.tab {
+  flex: 1;
+  padding: 13px;
+  background: none;
+  border: none;
+  color: var(--t3);
+  font: 500 14px/1 -apple-system, system-ui, sans-serif;
+  cursor: pointer;
+  position: relative;
+  transition: color .15s;
+  -webkit-appearance: none;
+}
+.tab.on { color: var(--t1); }
+.tab.on::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 16px; right: 16px;
+  height: 2px;
+  background: var(--a);
+  border-radius: 1px;
+}
+
+.auth-form { padding: 24px 24px 28px; }
+
+.field { margin-bottom: 14px; }
+
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t2);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+
+input, textarea, select {
+  width: 100%;
+  background: var(--s2);
+  border: 1px solid var(--bd);
+  border-radius: var(--rs);
+  color: var(--t1);
+  font: 400 16px/1.4 -apple-system, system-ui, sans-serif;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  -webkit-appearance: none;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--a);
+  box-shadow: 0 0 0 3px rgba(124,109,247,.12);
+}
+input::placeholder, textarea::placeholder { color: var(--t3); }
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px;
+  background: var(--a);
+  border: none;
+  border-radius: var(--rs);
+  color: #fff;
+  font: 500 15px/1 -apple-system, system-ui, sans-serif;
+  cursor: pointer;
+  transition: background .15s, transform .1s, opacity .15s;
+  -webkit-appearance: none;
+  margin-top: 4px;
+}
+.btn:hover { background: var(--a2); }
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn.ghost {
+  background: var(--s2);
+  color: var(--t1);
+  border: 1px solid var(--bd);
+}
+.btn.ghost:hover { background: var(--s3); }
+
+.alert {
+  margin-top: 14px;
+  padding: 11px 14px;
+  border-radius: var(--rs);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.alert.err {
+  background: rgba(244,80,96,.1);
+  border: 1px solid rgba(244,80,96,.25);
+  color: var(--err);
+}
+.alert.ok {
+  background: rgba(52,201,126,.1);
+  border: 1px solid rgba(52,201,126,.25);
+  color: var(--ok);
+}
+
+/* Success state */
+.success-body { padding: 28px 24px 32px; }
+.success-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(52,201,126,.12);
+  border: 1px solid rgba(52,201,126,.2);
+  margin: 0 auto 20px;
+}
+
+.key-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--s2);
+  border: 1px solid var(--bd);
+  border-radius: var(--rs);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.key-box code {
+  flex: 1;
+  font: 400 12.5px/1.4 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  color: var(--t1);
+  word-break: break-all;
+}
+.copy-btn {
+  background: none;
+  border: none;
+  color: var(--t2);
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+  border-radius: var(--rx);
+  transition: color .15s, background .15s;
+  display: flex;
+}
+.copy-btn:hover { color: var(--a); background: var(--ah); }
+.copy-btn.did { color: var(--ok); }
+
+.hint { font-size: 12px; color: var(--t3); margin-bottom: 20px; line-height: 1.6; }
+
+/* ── Playground ── */
+.pg { flex: 1; display: flex; flex-direction: column; max-width: 680px; width: 100%; margin: 0 auto; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--bd);
+  position: sticky;
+  top: env(safe-area-inset-top, 0);
+  background: var(--bg);
+  z-index: 20;
+}
+
+.logo { display: flex; gap: 4px; align-items: center; }
+.ld { border-radius: 50%; background: var(--a); }
+.ld:nth-child(1) { width: 6px; height: 6px; opacity: .7; }
+.ld:nth-child(2) { width: 10px; height: 10px; }
+.ld:nth-child(3) { width: 6px; height: 6px; opacity: .4; background: var(--t3); }
+
+.key-label {
+  flex: 1;
+  font: 400 12px/1 'SF Mono', 'Fira Code', monospace;
+  color: var(--t3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--t3);
+  cursor: pointer;
+  padding: 7px;
+  border-radius: var(--rx);
+  display: flex;
+  align-items: center;
+  transition: color .15s, background .15s;
+  flex-shrink: 0;
+}
+.icon-btn:hover { color: var(--t1); background: var(--s2); }
+
+.pg-body {
+  flex: 1;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+textarea.qin {
+  resize: none;
+  min-height: 72px;
+  line-height: 1.6;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t2);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin-bottom: 9px;
+}
+
+.pills {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.pill {
+  padding: 7px 14px;
+  border: 1px solid var(--bd);
+  border-radius: 99px;
+  font: 400 13px/1 -apple-system, system-ui, sans-serif;
+  color: var(--t2);
+  background: none;
+  cursor: pointer;
+  transition: all .15s;
+  -webkit-appearance: none;
+}
+.pill.on {
+  background: var(--ah);
+  border-color: var(--a);
+  color: var(--a2);
+}
+
+.inline-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.inline-row label { margin: 0; white-space: nowrap; }
+
+select {
+  width: auto;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.divider {
+  height: 1px;
+  background: var(--bd);
+  margin: 2px 0;
+}
+
+/* Results */
+.results-info {
+  font-size: 12px;
+  color: var(--t3);
+}
+
+.card {
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color .15s;
+}
+.card:hover { border-color: var(--bd2); }
+
+.card-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--t1);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.card-url {
+  font-size: 12px;
+  color: var(--t3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.score {
+  font-size: 11px;
+  color: var(--a2);
+  background: var(--ah);
+  padding: 3px 8px;
+  border-radius: 99px;
+  flex-shrink: 0;
+}
+
+.card-text {
+  font-size: 13px;
+  color: var(--t2);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.loading-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 16px;
+  color: var(--t3);
+  font-size: 14px;
+}
+.spin {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--bd2);
+  border-top-color: var(--a);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty {
+  text-align: center;
+  padding: 56px 20px;
+  color: var(--t3);
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+
+const S = {
+  view: 'auth',
+  tab: 'login',
+  apiKey: null,
+  newKey: null,
+  loading: false,
+  error: null,
+  query: '',
+  type: 'auto',
+  n: 10,
+  results: null,
+  busy: false,
+  serr: null,
+  took: null,
+};
+
+function init() {
+  const k = localStorage.getItem('sp_key');
+  if (k) { S.apiKey = k; S.view = 'playground'; }
+  render();
+}
+
+function patch(obj) { Object.assign(S, obj); render(); }
+
+function render() {
+  document.getElementById('app').innerHTML =
+    S.view === 'playground' ? pgHTML() : authHTML();
+  bind();
+}
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function svgCopy() {
+  return `<svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+    <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/>
+    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" stroke-width="1.5"/>
+  </svg>`;
+}
+function svgLogout() {
+  return `<svg width="17" height="17" fill="none" viewBox="0 0 24 24">
+    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"
+      stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+function svgCheck() {
+  return `<svg width="26" height="26" fill="none" viewBox="0 0 24 24">
+    <path d="M5 12l5 5L19 7" stroke="#34c97e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+function authHTML() {
+  if (S.view === 'success') {
+    const k = esc(S.newKey || '');
+    return `<div class="auth-wrap"><div class="auth-card">
+      <div class="success-body">
+        <div class="success-check">${svgCheck()}</div>
+        <p style="text-align:center;font-size:17px;font-weight:600;margin-bottom:22px">Account created</p>
+        <label>API Key</label>
+        <div class="key-box">
+          <code id="keyText">${k}</code>
+          <button class="copy-btn" id="cpyBtn" onclick="cpyKey()" title="Copy">${svgCopy()}</button>
+        </div>
+        <p class="hint">Copy and store this key. It will not be shown again after you leave this page.</p>
+        <button class="btn" onclick="openPg()">Open Playground</button>
+        <button class="btn ghost" style="margin-top:10px" onclick="patch({view:'auth',tab:'login'})">Back to sign in</button>
+      </div>
+    </div></div>`;
+  }
+
+  const reg = S.tab === 'register';
+  const errHTML = S.error ? `<div class="alert err">${esc(S.error)}</div>` : '';
+  const loading = S.loading;
+  const btnLabel = reg ? 'Create account' : 'Sign in';
+
+  return `<div class="auth-wrap"><div class="auth-card">
+    <div class="auth-icon">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+    <div class="tabs">
+      <button class="tab${!reg ? ' on' : ''}" onclick="patch({tab:'login',error:null})">Sign in</button>
+      <button class="tab${reg ? ' on' : ''}" onclick="patch({tab:'register',error:null})">Sign up</button>
+    </div>
+    <div class="auth-form">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="femail" placeholder="you@example.com" autocomplete="email" value="${esc(S._em || '')}">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="fpass" placeholder="••••••••" autocomplete="${reg ? 'new-password' : 'current-password'}">
+      </div>
+      ${reg ? `<div class="field">
+        <label>Confirm password</label>
+        <input type="password" id="fconf" placeholder="••••••••" autocomplete="new-password">
+      </div>` : ''}
+      <button class="btn" id="subBtn" onclick="${reg ? 'doReg()' : 'doLogin()'}" ${loading ? 'disabled' : ''}>
+        ${loading ? '<div class="spin"></div>' : ''}${esc(btnLabel)}
+      </button>
+      ${errHTML}
+    </div>
+  </div></div>`;
+}
+
+function pgHTML() {
+  const kd = S.apiKey ? S.apiKey.slice(0, 8) + '···' + S.apiKey.slice(-4) : '';
+  const types = ['auto','fast','neural','keyword','deep-lite','deep'];
+
+  let body = '';
+  if (S.busy) {
+    body = `<div class="loading-row"><div class="spin"></div><span>Searching…</span></div>`;
+  } else if (S.serr) {
+    body = `<div class="alert err">${esc(S.serr)}</div>`;
+  } else if (S.results !== null) {
+    if (S.results.length === 0) {
+      body = `<div class="empty">No results — try a different query</div>`;
+    } else {
+      const info = `<div class="results-info">${S.results.length} result${S.results.length !== 1 ? 's' : ''}${S.took != null ? ' · ' + S.took.toFixed(2) + 's' : ''}</div>`;
+      const cards = S.results.map(r => {
+        const domain = (() => { try { return new URL(r.url).hostname; } catch { return r.url; } })();
+        const scoreHTML = r.score != null ? `<span class="score">${Math.round(r.score * 100)}%</span>` : '';
+        const titleHTML = r.title ? `<div class="card-title">${esc(r.title)}</div>` : '';
+        const textHTML = r.text ? `<div class="card-text">${esc(r.text)}</div>` : '';
+        return `<div class="card">
+          ${titleHTML}
+          <div class="card-meta">
+            <span class="card-url">${esc(domain)}</span>
+            ${scoreHTML}
+          </div>
+          ${textHTML}
+        </div>`;
+      }).join('');
+      body = info + cards;
+    }
+  }
+
+  return `<div class="pg">
+    <div class="topbar">
+      <div class="logo"><div class="ld"></div><div class="ld"></div><div class="ld"></div></div>
+      <span class="key-label">${esc(kd)}</span>
+      <button class="icon-btn" title="Copy API key" onclick="cpyApiKey()">${svgCopy()}</button>
+      <button class="icon-btn" title="Sign out" onclick="doLogout()">${svgLogout()}</button>
+    </div>
+    <div class="pg-body">
+      <div class="field" style="margin:0">
+        <label>Query</label>
+        <textarea class="qin" id="qin" placeholder="What are you looking for?" rows="3">${esc(S.query)}</textarea>
+      </div>
+      <div>
+        <div class="section-label">Search type</div>
+        <div class="pills">
+          ${types.map(t => `<button class="pill${S.type === t ? ' on' : ''}" onclick="patch({type:'${t}'})">${t}</button>`).join('')}
+        </div>
+      </div>
+      <div class="inline-row">
+        <label>Results</label>
+        <select id="nsel" onchange="patch({n:+this.value})">
+          ${[5,10,15,20].map(v => `<option value="${v}"${S.n === v ? ' selected' : ''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn" style="margin:0" onclick="doSearch()" ${S.busy ? 'disabled' : ''}>
+        ${S.busy ? '<div class="spin"></div>Searching…' : 'Search'}
+      </button>
+      ${S.results !== null || S.busy || S.serr ? '<div class="divider"></div>' : ''}
+      ${body}
+    </div>
+  </div>`;
+}
+
+function bind() {
+  const q = document.getElementById('qin');
+  if (q) {
+    q.addEventListener('input', e => { S.query = e.target.value; });
+    q.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) doSearch(); });
+    q.focus();
+    q.setSelectionRange(q.value.length, q.value.length);
+  }
+  const em = document.getElementById('femail');
+  if (em) {
+    em.addEventListener('input', e => { S._em = e.target.value; });
+    em.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('fpass')?.focus(); });
+    em.focus();
+  }
+  const pw = document.getElementById('fpass');
+  if (pw) {
+    pw.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const cf = document.getElementById('fconf');
+        if (cf) cf.focus(); else (S.tab === 'register' ? doReg : doLogin)();
+      }
+    });
+  }
+  const cf = document.getElementById('fconf');
+  if (cf) cf.addEventListener('keydown', e => { if (e.key === 'Enter') doReg(); });
+}
+
+async function doLogin() {
+  const email = (document.getElementById('femail')?.value || '').trim();
+  const pass = document.getElementById('fpass')?.value || '';
+  if (!email) return patch({ error: 'Email is required' });
+  if (!pass) return patch({ error: 'Password is required' });
+  patch({ loading: true, error: null });
+  try {
+    const r = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password: pass }),
+    });
+    const d = await r.json();
+    if (!r.ok) return patch({ loading: false, error: d.error || 'Sign in failed' });
+    localStorage.setItem('sp_key', d.apiKey);
+    patch({ loading: false, apiKey: d.apiKey, view: 'playground', results: null, query: '' });
+  } catch {
+    patch({ loading: false, error: 'Network error — check connection' });
+  }
+}
+
+async function doReg() {
+  const email = (document.getElementById('femail')?.value || '').trim();
+  const pass = document.getElementById('fpass')?.value || '';
+  const conf = document.getElementById('fconf')?.value || '';
+  if (!email || !email.includes('@')) return patch({ error: 'Valid email required' });
+  if (pass.length < 8) return patch({ error: 'Password must be at least 8 characters' });
+  if (pass !== conf) return patch({ error: 'Passwords do not match' });
+  patch({ loading: true, error: null });
+  try {
+    const r = await fetch('/auth/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password: pass }),
+    });
+    const d = await r.json();
+    if (!r.ok) return patch({ loading: false, error: d.error || 'Registration failed' });
+    patch({ loading: false, view: 'success', newKey: d.apiKey, apiKey: d.apiKey });
+  } catch {
+    patch({ loading: false, error: 'Network error — check connection' });
+  }
+}
+
+function openPg() {
+  localStorage.setItem('sp_key', S.apiKey);
+  patch({ view: 'playground', results: null, query: '' });
+}
+
+function doLogout() {
+  localStorage.removeItem('sp_key');
+  patch({ view: 'auth', tab: 'login', apiKey: null, newKey: null, results: null, serr: null, error: null, query: '', busy: false });
+}
+
+function cpyKey() {
+  navigator.clipboard.writeText(S.newKey || '').then(() => {
+    const b = document.getElementById('cpyBtn');
+    if (!b) return;
+    b.classList.add('did');
+    b.innerHTML = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+      <path d="M5 12l5 5L19 7" stroke="#34c97e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+    setTimeout(() => { b.classList.remove('did'); b.innerHTML = '${svgCopy()}'; render(); }, 2000);
+  }).catch(() => {});
+}
+
+function cpyApiKey() {
+  if (S.apiKey) navigator.clipboard.writeText(S.apiKey).catch(() => {});
+}
+
+async function doSearch() {
+  const qEl = document.getElementById('qin');
+  const q = (qEl ? qEl.value : S.query).trim();
+  if (!q) return;
+  S.query = q;
+  patch({ busy: true, serr: null, results: null, took: null });
+  try {
+    const r = await fetch('/search', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'authorization': 'Bearer ' + S.apiKey,
+      },
+      body: JSON.stringify({ query: q, type: S.type, numResults: S.n }),
+    });
+    if (r.status === 401) { doLogout(); return; }
+    const d = await r.json();
+    if (!r.ok) return patch({ busy: false, serr: d.error || 'Search failed' });
+    patch({ busy: false, results: d.results || [], took: d.searchTime ?? null });
+  } catch {
+    patch({ busy: false, serr: 'Network error — check connection' });
+  }
+}
+
+init();
+</script>
+</body>
+</html>
