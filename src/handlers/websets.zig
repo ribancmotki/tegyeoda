@@ -231,7 +231,7 @@ pub fn createWebhook(req: *common.HttpRequest, auth: common.AuthContext, state: 
         "INSERT INTO webhooks (team_id, url, secret) VALUES ($1, $2, $3) RETURNING id::text",
         &.{ team_str, url, secret },
     ) catch null;
-    var id_str: []u8 = try uuid_util.toString(uuid_util.generate(), allocator);
+    var id_str: []const u8 = try uuid_util.toString(uuid_util.generate(), allocator);
     defer allocator.free(id_str);
     if (rs) |*r| {
         defer r.deinit();

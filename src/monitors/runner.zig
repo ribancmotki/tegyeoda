@@ -40,7 +40,11 @@ fn runMonitorInner(state: *app_state.AppState, monitor_row: common.MonitorRow, a
         }
     }
 
-    const dummy_auth = common.AuthContext{
+    // Monitor runs execute on behalf of the team that owns the monitor; there
+    // is no per-user API key. We synthesise an AuthContext that uses the
+    // monitor's team id for both fields so downstream code that filters by
+    // team_id continues to work.
+    const system_auth = common.AuthContext{
         .api_key_id = monitor_row.team_id,
         .team_id = monitor_row.team_id,
     };
@@ -51,7 +55,7 @@ fn runMonitorInner(state: *app_state.AppState, monitor_row: common.MonitorRow, a
             .type = .auto,
             .num_results = 10,
         };
-        const search_resp = engine.search(search_req, dummy_auth, allocator) catch null;
+        const search_resp = engine.search(search_req, system_auth, allocator) catch null;
         _ = search_resp;
     }
 

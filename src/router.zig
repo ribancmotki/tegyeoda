@@ -137,19 +137,19 @@ fn routeResearch(
     const method = req.method;
 
     if (std.mem.eql(u8, path, "/v1/research/tasks")) {
-        if (std.mem.eql(u8, method, "POST")) return research_handler.createTask(req, auth, state, allocator);
-        if (std.mem.eql(u8, method, "GET")) return research_handler.listTasks(req, auth, state, allocator);
-        return methodNotAllowedJson(allocator, "GET, POST");
+        if (std.mem.eql(u8, method, "POST")) return try research_handler.createTask(req, auth, state, allocator);
+        if (std.mem.eql(u8, method, "GET")) return try research_handler.listTasks(req, auth, state, allocator);
+        return try methodNotAllowedJson(allocator, "GET, POST");
     }
 
     if (!std.mem.startsWith(u8, path, "/v1/research/tasks/")) return null;
 
     const task_id = path["/v1/research/tasks/".len..];
-    if (!isSinglePathSegment(task_id)) return notFoundJson(allocator, true);
+    if (!isSinglePathSegment(task_id)) return try notFoundJson(allocator, true);
 
-    if (std.mem.eql(u8, method, "GET")) return research_handler.getTask(req, auth, state, task_id, allocator);
-    if (std.mem.eql(u8, method, "DELETE")) return research_handler.cancelTask(req, auth, state, task_id, allocator);
-    return methodNotAllowedJson(allocator, "DELETE, GET");
+    if (std.mem.eql(u8, method, "GET")) return try research_handler.getTask(req, auth, state, task_id, allocator);
+    if (std.mem.eql(u8, method, "DELETE")) return try research_handler.cancelTask(req, auth, state, task_id, allocator);
+    return try methodNotAllowedJson(allocator, "DELETE, GET");
 }
 
 fn routeMonitors(
@@ -162,14 +162,14 @@ fn routeMonitors(
     const method = req.method;
 
     if (std.mem.eql(u8, path, "/v1/monitors")) {
-        if (std.mem.eql(u8, method, "GET")) return monitors_handler.listMonitors(req, auth, state, allocator);
-        if (std.mem.eql(u8, method, "POST")) return monitors_handler.createMonitor(req, auth, state, allocator);
-        return methodNotAllowedJson(allocator, "GET, POST");
+        if (std.mem.eql(u8, method, "GET")) return try monitors_handler.listMonitors(req, auth, state, allocator);
+        if (std.mem.eql(u8, method, "POST")) return try monitors_handler.createMonitor(req, auth, state, allocator);
+        return try methodNotAllowedJson(allocator, "GET, POST");
     }
 
     if (std.mem.eql(u8, path, "/v1/monitors/batch")) {
-        if (std.mem.eql(u8, method, "POST")) return monitors_handler.batchMonitors(req, auth, state, allocator);
-        return methodNotAllowedJson(allocator, "POST");
+        if (std.mem.eql(u8, method, "POST")) return try monitors_handler.batchMonitors(req, auth, state, allocator);
+        return try methodNotAllowedJson(allocator, "POST");
     }
 
     if (!std.mem.startsWith(u8, path, "/v1/monitors/")) return null;
@@ -179,33 +179,33 @@ fn routeMonitors(
     const monitor_id = first.head;
     const sub = first.tail;
 
-    if (!isSinglePathSegment(monitor_id)) return notFoundJson(allocator, true);
+    if (!isSinglePathSegment(monitor_id)) return try notFoundJson(allocator, true);
 
     if (sub.len == 0) {
-        if (std.mem.eql(u8, method, "GET")) return monitors_handler.getMonitor(req, auth, state, monitor_id, allocator);
-        if (std.mem.eql(u8, method, "PATCH")) return monitors_handler.updateMonitor(req, auth, state, monitor_id, allocator);
-        if (std.mem.eql(u8, method, "DELETE")) return monitors_handler.deleteMonitor(req, auth, state, monitor_id, allocator);
-        return methodNotAllowedJson(allocator, "DELETE, GET, PATCH");
+        if (std.mem.eql(u8, method, "GET")) return try monitors_handler.getMonitor(req, auth, state, monitor_id, allocator);
+        if (std.mem.eql(u8, method, "PATCH")) return try monitors_handler.updateMonitor(req, auth, state, monitor_id, allocator);
+        if (std.mem.eql(u8, method, "DELETE")) return try monitors_handler.deleteMonitor(req, auth, state, monitor_id, allocator);
+        return try methodNotAllowedJson(allocator, "DELETE, GET, PATCH");
     }
 
     if (std.mem.eql(u8, sub, "/trigger")) {
-        if (std.mem.eql(u8, method, "POST")) return monitors_handler.triggerMonitor(req, auth, state, monitor_id, allocator);
-        return methodNotAllowedJson(allocator, "POST");
+        if (std.mem.eql(u8, method, "POST")) return try monitors_handler.triggerMonitor(req, auth, state, monitor_id, allocator);
+        return try methodNotAllowedJson(allocator, "POST");
     }
 
     if (std.mem.eql(u8, sub, "/runs")) {
-        if (std.mem.eql(u8, method, "GET")) return monitors_handler.listRuns(req, auth, state, monitor_id, allocator);
-        return methodNotAllowedJson(allocator, "GET");
+        if (std.mem.eql(u8, method, "GET")) return try monitors_handler.listRuns(req, auth, state, monitor_id, allocator);
+        return try methodNotAllowedJson(allocator, "GET");
     }
 
     if (std.mem.startsWith(u8, sub, "/runs/")) {
         const run_id = sub["/runs/".len..];
-        if (!isSinglePathSegment(run_id)) return notFoundJson(allocator, true);
-        if (std.mem.eql(u8, method, "GET")) return monitors_handler.getRun(req, auth, state, monitor_id, run_id, allocator);
-        return methodNotAllowedJson(allocator, "GET");
+        if (!isSinglePathSegment(run_id)) return try notFoundJson(allocator, true);
+        if (std.mem.eql(u8, method, "GET")) return try monitors_handler.getRun(req, auth, state, monitor_id, run_id, allocator);
+        return try methodNotAllowedJson(allocator, "GET");
     }
 
-    return notFoundJson(allocator, true);
+    return try notFoundJson(allocator, true);
 }
 
 fn routeWebsets(
@@ -218,14 +218,14 @@ fn routeWebsets(
     const method = req.method;
 
     if (std.mem.eql(u8, path, "/v1/websets")) {
-        if (std.mem.eql(u8, method, "GET")) return websets_handler.listWebsets(req, auth, state, allocator);
-        if (std.mem.eql(u8, method, "POST")) return websets_handler.createWebset(req, auth, state, allocator);
-        return methodNotAllowedJson(allocator, "GET, POST");
+        if (std.mem.eql(u8, method, "GET")) return try websets_handler.listWebsets(req, auth, state, allocator);
+        if (std.mem.eql(u8, method, "POST")) return try websets_handler.createWebset(req, auth, state, allocator);
+        return try methodNotAllowedJson(allocator, "GET, POST");
     }
 
     if (std.mem.eql(u8, path, "/v1/websets/preview")) {
-        if (std.mem.eql(u8, method, "POST")) return websets_handler.previewWebset(req, auth, state, allocator);
-        return methodNotAllowedJson(allocator, "POST");
+        if (std.mem.eql(u8, method, "POST")) return try websets_handler.previewWebset(req, auth, state, allocator);
+        return try methodNotAllowedJson(allocator, "POST");
     }
 
     if (!std.mem.startsWith(u8, path, "/v1/websets/")) return null;
@@ -243,17 +243,17 @@ fn routeEvents(
     const method = req.method;
 
     if (std.mem.eql(u8, path, "/v1/events")) {
-        if (std.mem.eql(u8, method, "GET")) return websets_handler.listEvents(req, auth, state, allocator);
-        return methodNotAllowedJson(allocator, "GET");
+        if (std.mem.eql(u8, method, "GET")) return try websets_handler.listEvents(req, auth, state, allocator);
+        return try methodNotAllowedJson(allocator, "GET");
     }
 
     if (!std.mem.startsWith(u8, path, "/v1/events/")) return null;
 
     const event_id = path["/v1/events/".len..];
-    if (!isSinglePathSegment(event_id)) return notFoundJson(allocator, true);
+    if (!isSinglePathSegment(event_id)) return try notFoundJson(allocator, true);
 
-    if (std.mem.eql(u8, method, "GET")) return websets_handler.getEvent(req, auth, state, event_id, allocator);
-    return methodNotAllowedJson(allocator, "GET");
+    if (std.mem.eql(u8, method, "GET")) return try websets_handler.getEvent(req, auth, state, event_id, allocator);
+    return try methodNotAllowedJson(allocator, "GET");
 }
 
 fn routeWebhooks(
@@ -266,9 +266,9 @@ fn routeWebhooks(
     const method = req.method;
 
     if (std.mem.eql(u8, path, "/v1/webhooks")) {
-        if (std.mem.eql(u8, method, "GET")) return websets_handler.listWebhooks(req, auth, state, allocator);
-        if (std.mem.eql(u8, method, "POST")) return websets_handler.createWebhook(req, auth, state, allocator);
-        return methodNotAllowedJson(allocator, "GET, POST");
+        if (std.mem.eql(u8, method, "GET")) return try websets_handler.listWebhooks(req, auth, state, allocator);
+        if (std.mem.eql(u8, method, "POST")) return try websets_handler.createWebhook(req, auth, state, allocator);
+        return try methodNotAllowedJson(allocator, "GET, POST");
     }
 
     if (!std.mem.startsWith(u8, path, "/v1/webhooks/")) return null;
@@ -278,21 +278,21 @@ fn routeWebhooks(
     const webhook_id = first.head;
     const sub = first.tail;
 
-    if (!isSinglePathSegment(webhook_id)) return notFoundJson(allocator, true);
+    if (!isSinglePathSegment(webhook_id)) return try notFoundJson(allocator, true);
 
     if (sub.len == 0) {
-        if (std.mem.eql(u8, method, "GET")) return websets_handler.getWebhook(req, auth, state, webhook_id, allocator);
-        if (std.mem.eql(u8, method, "PATCH")) return websets_handler.updateWebhook(req, auth, state, webhook_id, allocator);
-        if (std.mem.eql(u8, method, "DELETE")) return websets_handler.deleteWebhook(req, auth, state, webhook_id, allocator);
-        return methodNotAllowedJson(allocator, "DELETE, GET, PATCH");
+        if (std.mem.eql(u8, method, "GET")) return try websets_handler.getWebhook(req, auth, state, webhook_id, allocator);
+        if (std.mem.eql(u8, method, "PATCH")) return try websets_handler.updateWebhook(req, auth, state, webhook_id, allocator);
+        if (std.mem.eql(u8, method, "DELETE")) return try websets_handler.deleteWebhook(req, auth, state, webhook_id, allocator);
+        return try methodNotAllowedJson(allocator, "DELETE, GET, PATCH");
     }
 
     if (std.mem.eql(u8, sub, "/attempts")) {
-        if (std.mem.eql(u8, method, "GET")) return websets_handler.listWebhookAttempts(req, auth, state, webhook_id, allocator);
-        return methodNotAllowedJson(allocator, "GET");
+        if (std.mem.eql(u8, method, "GET")) return try websets_handler.listWebhookAttempts(req, auth, state, webhook_id, allocator);
+        return try methodNotAllowedJson(allocator, "GET");
     }
 
-    return notFoundJson(allocator, true);
+    return try notFoundJson(allocator, true);
 }
 
 fn routeTeam(
@@ -305,14 +305,14 @@ fn routeTeam(
     const method = req.method;
 
     if (std.mem.eql(u8, path, "/v1/team")) {
-        if (std.mem.eql(u8, method, "GET")) return websets_handler.getTeamInfo(req, auth, state, allocator);
-        return methodNotAllowedJson(allocator, "GET");
+        if (std.mem.eql(u8, method, "GET")) return try websets_handler.getTeamInfo(req, auth, state, allocator);
+        return try methodNotAllowedJson(allocator, "GET");
     }
 
     if (std.mem.eql(u8, path, "/v1/team/apikeys")) {
-        if (std.mem.eql(u8, method, "GET")) return team_handler.listApiKeys(req, auth, state, allocator);
-        if (std.mem.eql(u8, method, "POST")) return team_handler.createApiKey(req, auth, state, allocator);
-        return methodNotAllowedJson(allocator, "GET, POST");
+        if (std.mem.eql(u8, method, "GET")) return try team_handler.listApiKeys(req, auth, state, allocator);
+        if (std.mem.eql(u8, method, "POST")) return try team_handler.createApiKey(req, auth, state, allocator);
+        return try methodNotAllowedJson(allocator, "GET, POST");
     }
 
     if (!std.mem.startsWith(u8, path, "/v1/team/apikeys/")) return null;
@@ -322,21 +322,21 @@ fn routeTeam(
     const key_id = first.head;
     const sub = first.tail;
 
-    if (!isSinglePathSegment(key_id)) return notFoundJson(allocator, true);
+    if (!isSinglePathSegment(key_id)) return try notFoundJson(allocator, true);
 
     if (sub.len == 0) {
-        if (std.mem.eql(u8, method, "GET")) return team_handler.getApiKey(req, auth, state, key_id, allocator);
-        if (std.mem.eql(u8, method, "PATCH")) return team_handler.updateApiKey(req, auth, state, key_id, allocator);
-        if (std.mem.eql(u8, method, "DELETE")) return team_handler.deleteApiKey(req, auth, state, key_id, allocator);
-        return methodNotAllowedJson(allocator, "DELETE, GET, PATCH");
+        if (std.mem.eql(u8, method, "GET")) return try team_handler.getApiKey(req, auth, state, key_id, allocator);
+        if (std.mem.eql(u8, method, "PATCH")) return try team_handler.updateApiKey(req, auth, state, key_id, allocator);
+        if (std.mem.eql(u8, method, "DELETE")) return try team_handler.deleteApiKey(req, auth, state, key_id, allocator);
+        return try methodNotAllowedJson(allocator, "DELETE, GET, PATCH");
     }
 
     if (std.mem.eql(u8, sub, "/usage")) {
-        if (std.mem.eql(u8, method, "GET")) return team_handler.getApiKeyUsage(req, auth, state, key_id, allocator);
-        return methodNotAllowedJson(allocator, "GET");
+        if (std.mem.eql(u8, method, "GET")) return try team_handler.getApiKeyUsage(req, auth, state, key_id, allocator);
+        return try methodNotAllowedJson(allocator, "GET");
     }
 
-    return notFoundJson(allocator, true);
+    return try notFoundJson(allocator, true);
 }
 
 fn routeImports(
@@ -349,20 +349,20 @@ fn routeImports(
     const method = req.method;
 
     if (std.mem.eql(u8, path, "/v1/imports")) {
-        if (std.mem.eql(u8, method, "GET")) return websets_handler.listImports(req, auth, state, allocator);
-        if (std.mem.eql(u8, method, "POST")) return websets_handler.createImport(req, auth, state, allocator);
-        return methodNotAllowedJson(allocator, "GET, POST");
+        if (std.mem.eql(u8, method, "GET")) return try websets_handler.listImports(req, auth, state, allocator);
+        if (std.mem.eql(u8, method, "POST")) return try websets_handler.createImport(req, auth, state, allocator);
+        return try methodNotAllowedJson(allocator, "GET, POST");
     }
 
     if (!std.mem.startsWith(u8, path, "/v1/imports/")) return null;
 
     const import_id = path["/v1/imports/".len..];
-    if (!isSinglePathSegment(import_id)) return notFoundJson(allocator, true);
+    if (!isSinglePathSegment(import_id)) return try notFoundJson(allocator, true);
 
-    if (std.mem.eql(u8, method, "GET")) return websets_handler.getImport(req, auth, state, import_id, allocator);
-    if (std.mem.eql(u8, method, "PATCH")) return websets_handler.updateImport(req, auth, state, import_id, allocator);
-    if (std.mem.eql(u8, method, "DELETE")) return websets_handler.deleteImport(req, auth, state, import_id, allocator);
-    return methodNotAllowedJson(allocator, "DELETE, GET, PATCH");
+    if (std.mem.eql(u8, method, "GET")) return try websets_handler.getImport(req, auth, state, import_id, allocator);
+    if (std.mem.eql(u8, method, "PATCH")) return try websets_handler.updateImport(req, auth, state, import_id, allocator);
+    if (std.mem.eql(u8, method, "DELETE")) return try websets_handler.deleteImport(req, auth, state, import_id, allocator);
+    return try methodNotAllowedJson(allocator, "DELETE, GET, PATCH");
 }
 
 fn serveFile(file_path: []const u8, content_type: []const u8, allocator: std.mem.Allocator) !common.HttpResponse {

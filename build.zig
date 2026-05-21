@@ -1,38 +1,106 @@
 const std = @import("std");
 
-const PQ_LIB_DIR = "/nix/store/xb4h083j02mr2ix7pgj7iawxh2hk100l-postgresql-15.7-lib/lib";
-const PQ_INC_DIR = "/nix/store/07s64wxjzk6z1glwxvl3yq81vdn42k40-postgresql-15.7/include";
-const HIREDIS_LIB_DIR = "/nix/store/8b9bdqwjxahgyl8yns92cva6b6j8kirz-hiredis-1.2.0/lib";
-const HIREDIS_INC_DIR = "/nix/store/8b9bdqwjxahgyl8yns92cva6b6j8kirz-hiredis-1.2.0/include";
-const SSL_LIB_DIR = "/nix/store/gp504m4dvw5k2pdx6pccf1km79fkcwgf-openssl-3.0.13/lib";
-const SSL_INC_DIR = "/nix/store/191vca5vdxdlr32k2hpzd66mic98930f-openssl-3.0.13-dev/include";
-const ZLIB_LIB_DIR = "/nix/store/lv6nackqis28gg7l2ic43f6nk52hb39g-zlib-1.3.1/lib";
-const ZLIB_INC_DIR = "/nix/store/qj9byzfvh7dd61kk0aglj7cwqj1xqg6l-zlib-1.3.1-dev/include";
+/// Resolve a list of pkg-config packages to their include/library directories
+/// and linker flags. Falls back to system defaults if pkg-config is unavailable.
+const PkgInfo = struct {
+    include_paths: std.ArrayList([]const u8),
+    library_paths: std.ArrayList([]const u8),
+    libs: std.ArrayList([]const u8),
 
-fn addLibs(step: *std.Build.Step.Compile) void {
-    step.addLibraryPath(.{ .cwd_relative = PQ_LIB_DIR });
-    step.addIncludePath(.{ .cwd_relative = PQ_INC_DIR });
-    step.addLibraryPath(.{ .cwd_relative = HIREDIS_LIB_DIR });
-    step.addIncludePath(.{ .cwd_relative = HIREDIS_INC_DIR });
-    step.addLibraryPath(.{ .cwd_relative = SSL_LIB_DIR });
-    step.addIncludePath(.{ .cwd_relative = SSL_INC_DIR });
-    step.addLibraryPath(.{ .cwd_relative = ZLIB_LIB_DIR });
-    step.addIncludePath(.{ .cwd_relative = ZLIB_INC_DIR });
+    fn init(allocator: std.mem.Allocator) PkgInfo {
+        return .{
+            .include_paths = std.ArrayList([]const u8).init(allocator),
+            .library_paths = std.ArrayList([]const u8).init(allocator),
+            .libs = std.ArrayList([]const u8).init(allocator),
+        };
+    }
+};
+
+fn runPkgConfig(b: *std.Build, args: []const []const u8) ?[]const u8 {
+    var argv = std.ArrayList([]const u8).init(b.allocator);
+    defer argv.deinit();
+    argv.append("pkg-config") catch return null;
+    argv.appendSlice(args) catch return null;
+
+    const result = std.process.Child.run(.{
+        .allocator = b.allocator,
+        .argv = argv.items,
+    }) catch return null;
+
+    if (result.term != .Exited or result.term.Exited != 0) {
+        return null;
+    }
+    return std.mem.trim(u8, result.stdout, " \r\n\t");
+}
+
+fn collectPkgInfo(b: *std.Build, packages: []const []const u8) PkgInfo {
+    var info = PkgInfo.init(b.allocator);
+
+    for (packages) |pkg| {
+        if (runPkgConfig(b, &.{ "--cflags-only-I", pkg })) |out| {
+            var it = std.mem.tokenizeAny(u8, out, " \t");
+            while (it.next()) |tok| {
+                if (std.mem.startsWith(u8, tok, "-I")) {
+                    const path = b.dupe(tok[2..]);
+                    info.include_paths.append(path) catch {};
+                }
+            }
+        }
+        if (runPkgConfig(b, &.{ "--libs-only-L", pkg })) |out| {
+            var it = std.mem.tokenizeAny(u8, out, " \t");
+            while (it.next()) |tok| {
+                if (std.mem.startsWith(u8, tok, "-L")) {
+                    const path = b.dupe(tok[2..]);
+                    info.library_paths.append(path) catch {};
+                }
+            }
+        }
+        if (runPkgConfig(b, &.{ "--libs-only-l", pkg })) |out| {
+            var it = std.mem.tokenizeAny(u8, out, " \t");
+            while (it.next()) |tok| {
+                if (std.mem.startsWith(u8, tok, "-l")) {
+                    const name = b.dupe(tok[2..]);
+                    info.libs.append(name) catch {};
+                }
+            }
+        }
+    }
+
+    return info;
+}
+
+fn addLibs(b: *std.Build, step: *std.Build.Step.Compile) void {
+    // Try pkg-config first; this works on Replit (nix), Ubuntu, NixOS, etc.
+    const info = collectPkgInfo(b, &.{ "libpq", "hiredis", "openssl", "zlib" });
+
+    for (info.include_paths.items) |p| {
+        step.addIncludePath(.{ .cwd_relative = p });
+    }
+    for (info.library_paths.items) |p| {
+        step.addLibraryPath(.{ .cwd_relative = p });
+    }
+
+    // Common system locations as a fallback (Ubuntu / Debian).
+    const fallback_includes = [_][]const u8{
+        "/usr/include/postgresql",
+        "/usr/include/hiredis",
+    };
+    for (fallback_includes) |p| {
+        std.fs.cwd().access(p, .{}) catch continue;
+        step.addIncludePath(.{ .cwd_relative = p });
+    }
+
     step.linkLibC();
-    step.linkSystemLibrary("pq");
-    step.linkSystemLibrary("hiredis");
-    step.linkSystemLibrary("ssl");
-    step.linkSystemLibrary("crypto");
-    step.linkSystemLibrary("z");
+
+    const linked_libs = [_][]const u8{ "pq", "hiredis", "ssl", "crypto", "z" };
+    for (linked_libs) |lib| {
+        step.linkSystemLibrary(lib);
+    }
 }
 
 pub fn build(b: *std.Build) void {
-    const target = b.resolveTargetQuery(.{
-        .cpu_arch = .x86_64,
-        .os_tag = .linux,
-        .abi = .gnu,
-    });
-    const optimize: std.builtin.OptimizeMode = .ReleaseFast;
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
 
     const options = b.addOptions();
     options.addOption([]const u8, "version", "0.1.0");
@@ -45,7 +113,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.root_module.addOptions("build_options", options);
-    addLibs(exe);
+    addLibs(b, exe);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -54,22 +122,16 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const test_step = b.step("test", "Run all tests");
-    const test_files = [_][]const u8{
-        "tests/search_test.zig",
-        "tests/contents_test.zig",
-        "tests/monitor_test.zig",
-        "tests/webset_test.zig",
-        "tests/billing_test.zig",
-    };
-    for (test_files) |tf| {
-        const unit_tests = b.addTest(.{
-            .root_source_file = b.path(tf),
-            .target = target,
-            .optimize = .Debug,
-        });
-        unit_tests.root_module.addOptions("build_options", options);
-        addLibs(unit_tests);
-        const run_tests = b.addRunArtifact(unit_tests);
-        test_step.dependOn(&run_tests.step);
-    }
+    // Single aggregating test root so that tests/ and src/ live in the same
+    // module — required by Zig 0.14 for the relative `@import("../src/...")`
+    // paths used by individual test files.
+    const unit_tests = b.addTest(.{
+        .root_source_file = b.path("test_root.zig"),
+        .target = target,
+        .optimize = .Debug,
+    });
+    unit_tests.root_module.addOptions("build_options", options);
+    addLibs(b, unit_tests);
+    const run_tests = b.addRunArtifact(unit_tests);
+    test_step.dependOn(&run_tests.step);
 }

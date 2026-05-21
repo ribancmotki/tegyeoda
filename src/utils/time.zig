@@ -25,13 +25,12 @@ pub fn parseIso8601(str: []const u8) !i64 {
         if (pos < str.len and str[pos] == '.') {
             while (pos < str.len and str[pos] != '+' and str[pos] != '-' and str[pos] != 'Z') pos += 1;
         }
-        if (pos < str.len and str[pos] == 'Z') {
-        } else if (pos < str.len and (str[pos] == '+' or str[pos] == '-')) {
+        if (pos < str.len and str[pos] == 'Z') {} else if (pos < str.len and (str[pos] == '+' or str[pos] == '-')) {
             const sign: i32 = if (str[pos] == '+') 1 else -1;
             pos += 1;
             if (pos + 4 <= str.len) {
-                const oh = try std.fmt.parseInt(u32, str[pos..pos + 2], 10);
-                const om = try std.fmt.parseInt(u32, str[pos + 3..pos + 5], 10);
+                const oh = try std.fmt.parseInt(u32, str[pos .. pos + 2], 10);
+                const om = try std.fmt.parseInt(u32, str[pos + 3 .. pos + 5], 10);
                 offset_minutes = sign * @as(i32, @intCast(oh * 60 + om));
             }
         }
@@ -50,15 +49,18 @@ pub fn formatIso8601(ts_ms: i64, allocator: std.mem.Allocator) ![]const u8 {
     const ts_s = @divFloor(ts_ms, 1000);
     const days = @divFloor(ts_s, 86400);
     const time_of_day = @mod(ts_s, 86400);
-    const hour = @divFloor(time_of_day, 3600);
-    const minute = @divFloor(@mod(time_of_day, 3600), 60);
-    const second = @mod(time_of_day, 60);
+    const hour: u32 = @intCast(@divFloor(time_of_day, 3600));
+    const minute: u32 = @intCast(@divFloor(@mod(time_of_day, 3600), 60));
+    const second: u32 = @intCast(@mod(time_of_day, 60));
     var y: i64 = 0;
     var m: u32 = 0;
     var d: u32 = 0;
     epochDaysToCivil(days, &y, &m, &d);
+    // Cast year to a non-negative type for formatting so width padding works
+    // correctly (signed `{d:0>N}` may include a leading sign character).
+    const y_u: u64 = @intCast(if (y < 0) -y else y);
     return std.fmt.allocPrint(allocator, "{d:0>4}-{d:0>2}-{d:0>2}T{d:0>2}:{d:0>2}:{d:0>2}Z", .{
-        y, m, d, hour, minute, second,
+        y_u, m, d, hour, minute, second,
     });
 }
 
@@ -73,7 +75,7 @@ fn civilToEpochDays(y: i32, m: u32, d: u32) !i64 {
     }
     const era: i64 = @divFloor(year, 400);
     const yoe: i64 = @as(i64, year) - era * 400;
-    const doy: i64 = (@as(i64, month) * 153 + 2) / 5 + @as(i64, d) - 1;
+    const doy: i64 = @divTrunc(@as(i64, month) * 153 + 2, 5) + @as(i64, d) - 1;
     const doe: i64 = yoe * 365 + @divFloor(yoe, 4) - @divFloor(yoe, 100) + doy;
     return era * 146097 + doe - 719468;
 }
@@ -105,12 +107,13 @@ pub fn formatDuration(ms: u64, buf: []u8) []const u8 {
 
 test "parse iso8601 utc" {
     const ts = try parseIso8601("2024-01-15T10:30:00Z");
-    try std.testing.expectEqual(@as(i64, 1705315800000), ts);
+    // 2024-01-15T10:30:00Z is unix ts 1705314600 (=1705314600000 ms).
+    try std.testing.expectEqual(@as(i64, 1705314600000), ts);
 }
 
 test "format iso8601" {
     const allocator = std.testing.allocator;
-    const str = try formatIso8601(1705315800000, allocator);
+    const str = try formatIso8601(1705314600000, allocator);
     defer allocator.free(str);
     try std.testing.expectEqualStrings("2024-01-15T10:30:00Z", str);
 }

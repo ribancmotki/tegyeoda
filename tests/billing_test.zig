@@ -22,5 +22,5 @@ test "time functions" {
     const s = time.nowSeconds();
     try std.testing.expect(ms > 0);
     try std.testing.expect(s > 0);
-    try std.testing.expect(ms / 1000 >= s - 1);
+    try std.testing.expect(@divTrunc(ms, 1000) >= s - 1);
 }

@@ -53,7 +53,8 @@ pub fn handleAnswer(req: *common.HttpRequest, auth: common.AuthContext, state: *
         \\Provide accurate, concise answers with citations to the sources.
     ;
 
-    const user_prompt = try std.fmt.allocPrint(allocator,
+    const user_prompt = try std.fmt.allocPrint(
+        allocator,
         "Question: {s}\n\nSources:\n{s}\n\nAnswer the question based on these sources.",
         .{ query, context_buf.items },
     );
@@ -67,7 +68,7 @@ pub fn handleAnswer(req: *common.HttpRequest, auth: common.AuthContext, state: *
     try citations_buf.appendSlice("[");
     for (search_resp.results, 0..) |r, i| {
         if (i > 0) try citations_buf.appendSlice(",");
-        try citations_buf.writer().print("{{\"url\":\"{s}\"", .{r.url});
+        try citations_buf.writer().print("{{\"url\":\"{s}\"", .{r.url orelse ""});
         if (r.title) |t| try citations_buf.writer().print(",\"title\":{s}", .{try jsonString(t, allocator)});
         try citations_buf.appendSlice("}");
     }
@@ -76,7 +77,8 @@ pub fn handleAnswer(req: *common.HttpRequest, auth: common.AuthContext, state: *
     const answer_json = try jsonString(answer_text, allocator);
     defer allocator.free(answer_json);
 
-    const body = try std.fmt.allocPrint(allocator,
+    const body = try std.fmt.allocPrint(
+        allocator,
         "{{\"requestId\":\"{s}\",\"answer\":{s},\"citations\":{s},\"costDollars\":{{\"total\":0.0000}}}}",
         .{ search_resp.request_id, answer_json, citations_buf.items },
     );
@@ -118,7 +120,8 @@ pub fn handleChatCompletions(req: *common.HttpRequest, auth: common.AuthContext,
     const id_str = try uuid_util.toString(id_val, allocator);
     defer allocator.free(id_str);
 
-    const body = try std.fmt.allocPrint(allocator,
+    const body = try std.fmt.allocPrint(
+        allocator,
         "{{\"id\":\"chatcmpl-{s}\",\"object\":\"chat.completion\",\"created\":{d},\"model\":\"{s}\",\"choices\":[{{\"index\":0,\"message\":{{\"role\":\"assistant\",\"content\":{s}}},\"finish_reason\":\"stop\"}}],\"usage\":{{\"prompt_tokens\":0,\"completion_tokens\":0,\"total_tokens\":0}}}}",
         .{ id_str, ts, model, resp_json },
     );

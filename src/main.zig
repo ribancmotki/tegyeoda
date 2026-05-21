@@ -54,9 +54,10 @@ pub fn main() !void {
             .ef_search = 50,
             .nodes = std.ArrayList(hnsw.HnswIndex.HnswNode).init(allocator),
             .vectors = std.ArrayList([]f32).init(allocator),
+            .vector_norms = std.ArrayList(f32).init(allocator),
             .mutex = std.Thread.RwLock{},
             .allocator = allocator,
-            .path = cfg.index_data_dir,
+            .path = try allocator.dupe(u8, cfg.index_data_dir),
         };
     };
     defer index.deinit();
