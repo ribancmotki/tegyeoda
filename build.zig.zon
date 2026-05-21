@@ -9,5 +9,6 @@
         "tests/",
         "build.zig",
         "build.zig.zon",
+        "test_root.zig",
     },
 }

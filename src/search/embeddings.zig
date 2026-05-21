@@ -7,7 +7,7 @@ pub const EmbeddingClient = struct {
     dim: usize,
 
     pub fn embed(self: *const EmbeddingClient, text: []const u8, allocator: std.mem.Allocator) ![]f32 {
-        if (self.url.len == 0) return self.mockEmbed(text, allocator);
+        if (self.url.len == 0) return self.fallbackEmbed(text, allocator);
 
         var body_buf = std.ArrayList(u8).init(allocator);
         defer body_buf.deinit();
@@ -19,16 +19,17 @@ pub const EmbeddingClient = struct {
         const body = body_buf.items;
         const client = http_client.HttpClient{ .base_url = "", .timeout_ms = 30000 };
         const resp = client.request("POST", self.url, body, allocator) catch |err| {
-            std.log.warn("Embedding API failed: {} - using mock embedding", .{err});
-            return self.mockEmbed(text, allocator);
+            std.log.warn("Embedding API failed: {} - falling back to deterministic hash embedding", .{err});
+            return self.fallbackEmbed(text, allocator);
         };
         defer allocator.free(resp.body);
 
         if (resp.status != 200) {
-            return self.mockEmbed(text, allocator);
+            std.log.warn("Embedding API returned status {d} - falling back to deterministic hash embedding", .{resp.status});
+            return self.fallbackEmbed(text, allocator);
         }
 
-        return self.parseResponse(resp.body, allocator) catch self.mockEmbed(text, allocator);
+        return self.parseResponse(resp.body, allocator) catch self.fallbackEmbed(text, allocator);
     }
 
     pub fn embedBatch(self: *const EmbeddingClient, texts: []const []const u8, allocator: std.mem.Allocator) ![][]f32 {
@@ -59,7 +60,7 @@ pub const EmbeddingClient = struct {
             };
         }
 
-        if (embedding_arr == null) return self.mockEmbed("", allocator);
+        if (embedding_arr == null) return self.fallbackEmbed("", allocator);
 
         const arr = embedding_arr.?;
         const dim = @min(arr.items.len, self.dim);
@@ -76,8 +77,16 @@ pub const EmbeddingClient = struct {
         return result;
     }
 
-    fn mockEmbed(self: *const EmbeddingClient, text: []const u8, allocator: std.mem.Allocator) ![]f32 {
+    /// Deterministic fallback embedding used when no embedding service is
+    /// configured or when the remote service is unreachable. Identical input
+    /// text always produces the same vector, which is enough for the index to
+    /// stay self-consistent (queries against documents embedded the same way
+    /// will still return sensible nearest-neighbours). It is NOT semantically
+    /// meaningful and should not be relied upon in production — configure a
+    /// real embedding endpoint via `EMBEDDING_MODEL_URL`.
+    fn fallbackEmbed(self: *const EmbeddingClient, text: []const u8, allocator: std.mem.Allocator) ![]f32 {
         const embedding = try allocator.alloc(f32, self.dim);
+        // FNV-1a hash of the input.
         var hash: u64 = 14695981039346656037;
         for (text) |c| {
             hash ^= @as(u64, c);

@@ -152,7 +152,9 @@ pub const SearchEngine = struct {
 
         std.sort.block(search_types.SearchResult, results.items, {}, struct {
             fn lessThan(_: void, a: search_types.SearchResult, b: search_types.SearchResult) bool {
-                return a.score > b.score;
+                const a_score = a.score orelse 0.0;
+                const b_score = b.score orelse 0.0;
+                return a_score > b_score;
             }
         }.lessThan);
 
@@ -251,13 +253,17 @@ pub const SearchEngine = struct {
         }
 
         for (doc_rows) |row| {
+            const published_str: ?[]const u8 = if (row.published_at) |ts|
+                try std.fmt.allocPrint(allocator, "{d}", .{ts})
+            else
+                null;
             try docs.append(common.ScoredDoc{
                 .id = row.id,
                 .url = row.url,
                 .title = row.title,
                 .score = 0.5,
                 .body_text = row.body_text,
-                .published_at = row.published_at,
+                .published_at = published_str,
                 .author = row.author,
                 .favicon_url = row.favicon_url,
                 .image_url = row.image_url,

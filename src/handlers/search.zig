@@ -102,7 +102,10 @@ pub fn handleSearch(req: *common.HttpRequest, auth: common.AuthContext, state: *
     });
     for (response.results, 0..) |result, i| {
         if (i > 0) try w.print(",", .{});
-        try w.print("{{\"id\":\"{s}\",\"url\":\"{s}\"", .{ result.id, result.url });
+        try w.print("{{\"id\":{s},\"url\":{s}", .{
+            try jsonStringOrNull(result.id, allocator),
+            try jsonStringOrNull(result.url, allocator),
+        });
         if (result.title) |t| try w.print(",\"title\":{s}", .{try jsonString(t, allocator)});
         if (result.score) |s| try w.print(",\"score\":{d:.6}", .{s});
         if (result.author) |a| try w.print(",\"author\":{s}", .{try jsonString(a, allocator)});
@@ -147,4 +150,9 @@ fn jsonString(s: []const u8, allocator: std.mem.Allocator) ![]const u8 {
     var buf = std.ArrayList(u8).init(allocator);
     try std.json.stringify(s, .{}, buf.writer());
     return buf.toOwnedSlice();
+}
+
+fn jsonStringOrNull(opt: ?[]const u8, allocator: std.mem.Allocator) ![]const u8 {
+    if (opt) |s| return jsonString(s, allocator);
+    return try allocator.dupe(u8, "null");
 }

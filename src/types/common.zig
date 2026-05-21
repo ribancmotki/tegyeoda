@@ -9,6 +9,12 @@ pub const CostDollars = struct {
     pub fn new() CostDollars {
         return CostDollars{};
     }
+
+    /// Convert an integer count of cents (1/100ths of a dollar) into a
+    /// floating-point dollar value.
+    pub fn toDollars(cents: i64) f64 {
+        return @as(f64, @floatFromInt(cents)) / 100.0;
+    }
 };
 
 pub const AuthContext = struct {
@@ -56,8 +62,8 @@ pub const ApiError = struct {
 };
 
 pub const ScoredDoc = struct {
-    id: []const u8,
-    url: []const u8,
+    id: ?[]const u8,
+    url: ?[]const u8,
     title: ?[]const u8,
     score: f32,
     body_text: ?[]const u8,
@@ -112,8 +118,8 @@ pub const TeamRow = struct {
 };
 
 pub const DocumentRow = struct {
-    id: []const u8,
-    url: []const u8,
+    id: ?[]const u8,
+    url: ?[]const u8,
     title: ?[]const u8,
     author: ?[]const u8,
     published_at: ?i64,

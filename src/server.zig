@@ -75,10 +75,10 @@ fn handleConnInner(stream: std.net.Stream, state: *app_state.AppState, allocator
     const req_id = uuid.generate();
     const req_id_str = try uuid.toString(req_id, allocator);
 
-    const parsed = parseHttpRequest(stream, allocator) catch |err| switch (err) {
+    var parsed = parseHttpRequest(stream, allocator) catch |err| switch (err) {
         error.UnexpectedEof => return,
         else => {
-            var resp = try parseErrorResponse(err, req_id_str, allocator);
+            const resp = try parseErrorResponse(err, req_id_str, allocator);
             try writeResponse(stream, resp, allocator, "");
             return;
         },
@@ -313,13 +313,7 @@ fn parseErrorResponse(err: anyerror, req_id_str: []const u8, allocator: std.mem.
         error.BodyTooLarge => 413,
         error.UnsupportedTransferEncoding => 501,
         error.UnsupportedHttpVersion => 505,
-        error.InvalidRequestLine,
-        error.InvalidHeaderLine,
-        error.InvalidContentLength,
-        error.DuplicateContentLength,
-        error.DuplicateHost,
-        error.InvalidPath,
-        error.InvalidPercentEncoding => 400,
+        error.InvalidRequestLine, error.InvalidHeaderLine, error.InvalidContentLength, error.DuplicateContentLength, error.DuplicateHost, error.InvalidPath, error.InvalidPercentEncoding => 400,
         else => 400,
     };
 

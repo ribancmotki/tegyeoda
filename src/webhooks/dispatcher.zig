@@ -6,6 +6,24 @@ const http_client = @import("../utils/http_client.zig");
 const signer = @import("./signer.zig");
 const time_util = @import("../utils/time.zig");
 const uuid_util = @import("../utils/uuid.zig");
+const app_state = @import("../app_state.zig");
+
+/// Convenience helper: fire a `webhook.created` event for the given team.
+/// Used by the handlers when a new webhook is registered. Errors are
+/// intentionally swallowed by the caller via `catch {}`.
+pub fn notifyWebhookCreated(state: *app_state.AppState, team_id: [16]u8, webhook_id: []const u8) !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const payload = std.json.Value{ .object = blk: {
+        var obj = std.json.ObjectMap.init(allocator);
+        try obj.put("id", .{ .string = try allocator.dupe(u8, webhook_id) });
+        break :blk obj;
+    } };
+
+    try dispatchEvent(state.pg_pool, state.redis_pool, team_id, "webhook.created", payload, allocator);
+}
 
 pub fn dispatchEvent(pg: *db_pool.Pool, rp: *redis_pool.Pool, team_id: [16]u8, event_type: []const u8, data: std.json.Value, allocator: std.mem.Allocator) !void {
     _ = rp;
@@ -43,7 +61,8 @@ fn buildPayload(event_type: []const u8, data_json: []const u8, allocator: std.me
     const event_id = uuid_util.generate();
     const event_id_str = try uuid_util.toString(event_id, allocator);
     defer allocator.free(event_id_str);
-    return std.fmt.allocPrint(allocator,
+    return std.fmt.allocPrint(
+        allocator,
         "{{\"id\":\"{s}\",\"type\":\"{s}\",\"createdAt\":{d},\"data\":{s}}}",
         .{ event_id_str, event_type, ts * 1000, data_json },
     );

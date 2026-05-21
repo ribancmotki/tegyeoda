@@ -96,8 +96,8 @@ pub const ExtrasResult = struct {
 
 pub const SearchResult = struct {
     title: ?[]const u8,
-    url: []const u8,
-    id: []const u8,
+    url: ?[]const u8,
+    id: ?[]const u8,
     published_date: ?[]const u8,
     author: ?[]const u8,
     score: ?f32,

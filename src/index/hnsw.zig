@@ -32,12 +32,12 @@ pub const HnswIndex = struct {
             .m = 16,
             .ef_construction = 200,
             .ef_search = 50,
-            .nodes = try std.ArrayList(HnswNode).initCapacity(allocator, 0),
-            .vectors = try std.ArrayList([]f32).initCapacity(allocator, 0),
+            .nodes = std.ArrayList(HnswNode).init(allocator),
+            .vectors = std.ArrayList([]f32).init(allocator),
             .mutex = .{},
             .allocator = allocator,
             .path = path_copy,
-            .vector_norms = try std.ArrayList(f32).initCapacity(allocator, 0),
+            .vector_norms = std.ArrayList(f32).init(allocator),
         };
         errdefer idx.deinit();
 
@@ -47,26 +47,25 @@ pub const HnswIndex = struct {
         };
         defer file.close();
 
-        var read_buffer: [4096]u8 = undefined;
-        var file_reader = file.reader(&read_buffer);
-        const reader = &file_reader.interface;
+        var br = std.io.bufferedReader(file.reader());
+        const reader = br.reader();
 
-        const magic = try reader.takeInt(u32, .little);
+        const magic = try reader.readInt(u32, .little);
         if (magic != FileMagic) return error.InvalidFormat;
 
-        const version = try reader.takeInt(u32, .little);
+        const version = try reader.readInt(u32, .little);
         if (version != 1 and version != FileVersion) return error.UnsupportedVersion;
 
-        const count_u64 = try reader.takeInt(u64, .little);
-        const file_dim_u64 = try reader.takeInt(u64, .little);
+        const count_u64 = try reader.readInt(u64, .little);
+        const file_dim_u64 = try reader.readInt(u64, .little);
 
         if (file_dim_u64 != dim) return error.DimensionMismatch;
 
-        const count = try std.math.cast(usize, count_u64) orelse return error.Overflow;
+        const count = std.math.cast(usize, count_u64) orelse return error.Overflow;
 
-        try idx.nodes.ensureTotalCapacity(allocator, count);
-        try idx.vectors.ensureTotalCapacity(allocator, count);
-        try idx.vector_norms.ensureTotalCapacity(allocator, count);
+        try idx.nodes.ensureTotalCapacity(count);
+        try idx.vectors.ensureTotalCapacity(count);
+        try idx.vector_norms.ensureTotalCapacity(count);
 
         if (version >= 2) {
             idx.m = try readBoundedUsize(reader, 1, 1024);
@@ -76,20 +75,20 @@ pub const HnswIndex = struct {
 
         var ci: usize = 0;
         while (ci < count) : (ci += 1) {
-            const id_len_u32 = try reader.takeInt(u32, .little);
+            const id_len_u32 = try reader.readInt(u32, .little);
             const id_len = @as(usize, @intCast(id_len_u32));
             if (id_len == 0 or id_len > max_id_len) return error.InvalidIdentifierLength;
 
             const id_buf = try allocator.alloc(u8, id_len);
             errdefer allocator.free(id_buf);
-            try reader.readSliceAll(id_buf);
+            try reader.readNoEof(id_buf);
 
             const vec = try allocator.alloc(f32, dim);
             errdefer allocator.free(vec);
 
             var norm_sq: f32 = 0;
             for (vec) |*v| {
-                const bits = try reader.takeInt(u32, .little);
+                const bits = try reader.readInt(u32, .little);
                 const value: f32 = @bitCast(bits);
                 if (!std.math.isFinite(value)) return error.InvalidVectorValue;
                 v.* = value;
@@ -100,8 +99,8 @@ pub const HnswIndex = struct {
             var neighbors: [][]u32 = &.{};
 
             if (version >= 2) {
-                node_level = try reader.takeInt(u32, .little);
-                const layer_count_u32 = try reader.takeInt(u32, .little);
+                node_level = try reader.readInt(u32, .little);
+                const layer_count_u32 = try reader.readInt(u32, .little);
                 const layer_count = @as(usize, @intCast(layer_count_u32));
                 if (layer_count == 0) {
                     if (node_level != 0) return error.InvalidLevelData;
@@ -118,16 +117,15 @@ pub const HnswIndex = struct {
                     }
 
                     for (0..layer_count) |layer_idx| {
-                        const neighbor_count_u32 = try reader.takeInt(u32, .little);
+                        const neighbor_count_u32 = try reader.readInt(u32, .little);
                         const neighbor_count = @as(usize, @intCast(neighbor_count_u32));
                         if (neighbor_count > idx.m) return error.InvalidNeighborCount;
 
                         const layer = try allocator.alloc(u32, neighbor_count);
                         neighbors[layer_idx] = layer;
 
-                        for (layer, 0..) |*dst, ni| {
-                            _ = ni;
-                            const neighbor_idx_u32 = try reader.takeInt(u32, .little);
+                        for (layer) |*dst| {
+                            const neighbor_idx_u32 = try reader.readInt(u32, .little);
                             const neighbor_idx = @as(usize, @intCast(neighbor_idx_u32));
                             if (neighbor_idx >= count) return error.InvalidNeighborIndex;
                             dst.* = neighbor_idx_u32;
@@ -138,13 +136,13 @@ pub const HnswIndex = struct {
 
             const norm = if (norm_sq > 0) @sqrt(norm_sq) else 0;
 
-            try idx.nodes.append(allocator, .{
+            try idx.nodes.append(.{
                 .id = id_buf,
                 .level = node_level,
                 .neighbors = neighbors,
             });
-            try idx.vectors.append(allocator, vec);
-            try idx.vector_norms.append(allocator, norm);
+            try idx.vectors.append(vec);
+            try idx.vector_norms.append(norm);
         }
 
         return idx;
@@ -154,7 +152,7 @@ pub const HnswIndex = struct {
         for (self.vectors.items) |vec| {
             self.allocator.free(vec);
         }
-        self.vectors.deinit(self.allocator);
+        self.vectors.deinit();
 
         for (self.nodes.items) |node| {
             self.allocator.free(node.id);
@@ -165,9 +163,9 @@ pub const HnswIndex = struct {
                 self.allocator.free(node.neighbors);
             }
         }
-        self.nodes.deinit(self.allocator);
+        self.nodes.deinit();
 
-        self.vector_norms.deinit(self.allocator);
+        self.vector_norms.deinit();
         self.allocator.free(self.path);
     }
 
@@ -181,16 +179,15 @@ pub const HnswIndex = struct {
             }
         }
 
-        var tmp_path = try std.fmt.allocPrint(self.allocator, "{s}.tmp", .{path});
+        const tmp_path = try std.fmt.allocPrint(self.allocator, "{s}.tmp", .{path});
         defer self.allocator.free(tmp_path);
 
         {
             const file = try std.fs.cwd().createFile(tmp_path, .{ .truncate = true, .read = false });
             defer file.close();
 
-            var write_buffer: [4096]u8 = undefined;
-            var file_writer = file.writer(&write_buffer);
-            const writer = &file_writer.interface;
+            var bw = std.io.bufferedWriter(file.writer());
+            const writer = bw.writer();
 
             if (self.nodes.items.len != self.vectors.items.len or self.nodes.items.len != self.vector_norms.items.len) {
                 return error.CorruptIndexState;
@@ -233,7 +230,7 @@ pub const HnswIndex = struct {
                 }
             }
 
-            try writer.flush();
+            try bw.flush();
             try file.sync();
         }
 
@@ -267,10 +264,10 @@ pub const HnswIndex = struct {
         const id_copy = try self.allocator.dupe(u8, id);
         errdefer self.allocator.free(id_copy);
 
-        try self.vectors.append(self.allocator, vec_copy);
+        try self.vectors.append(vec_copy);
         errdefer self.vectors.items.len -= 1;
 
-        try self.vector_norms.append(self.allocator, norm);
+        try self.vector_norms.append(norm);
         errdefer self.vector_norms.items.len -= 1;
 
         const node = HnswNode{
@@ -279,7 +276,7 @@ pub const HnswIndex = struct {
             .neighbors = &.{},
         };
 
-        try self.nodes.append(self.allocator, node);
+        try self.nodes.append(node);
         errdefer {
             self.nodes.items.len -= 1;
             self.allocator.free(id_copy);
@@ -356,8 +353,8 @@ pub const HnswIndex = struct {
     }
 
     fn readBoundedUsize(reader: anytype, min: usize, max: usize) !usize {
-        const value_u64 = try reader.takeInt(u64, .little);
-        const value = try std.math.cast(usize, value_u64) orelse return error.Overflow;
+        const value_u64 = try reader.readInt(u64, .little);
+        const value = std.math.cast(usize, value_u64) orelse return error.Overflow;
         if (value < min or value > max) return error.InvalidParameter;
         return value;
     }
@@ -446,12 +443,12 @@ test "insert and search" {
         .m = 16,
         .ef_construction = 200,
         .ef_search = 50,
-        .nodes = try std.ArrayList(HnswIndex.HnswNode).initCapacity(allocator, 0),
-        .vectors = try std.ArrayList([]f32).initCapacity(allocator, 0),
+        .nodes = std.ArrayList(HnswIndex.HnswNode).init(allocator),
+        .vectors = std.ArrayList([]f32).init(allocator),
         .mutex = .{},
         .allocator = allocator,
         .path = try allocator.dupe(u8, "test.hnsw"),
-        .vector_norms = try std.ArrayList(f32).initCapacity(allocator, 0),
+        .vector_norms = std.ArrayList(f32).init(allocator),
     };
     defer index.deinit();
 
@@ -480,12 +477,12 @@ test "save and load" {
             .m = 8,
             .ef_construction = 100,
             .ef_search = 25,
-            .nodes = try std.ArrayList(HnswIndex.HnswNode).initCapacity(allocator, 0),
-            .vectors = try std.ArrayList([]f32).initCapacity(allocator, 0),
+            .nodes = std.ArrayList(HnswIndex.HnswNode).init(allocator),
+            .vectors = std.ArrayList([]f32).init(allocator),
             .mutex = .{},
             .allocator = allocator,
             .path = try allocator.dupe(u8, path),
-            .vector_norms = try std.ArrayList(f32).initCapacity(allocator, 0),
+            .vector_norms = std.ArrayList(f32).init(allocator),
         };
         defer index.deinit();
 

@@ -30,7 +30,7 @@ fn parseOptionalJsonValue(allocator: std.mem.Allocator, text: ?[]const u8) !?std
     return null;
 }
 
-fn parseJsonStringArray(allocator: std.mem.Allocator, text: []const u8) ![]const []const u8 {
+fn parseJsonStringArray(allocator: std.mem.Allocator, text: []const u8) ![][]const u8 {
     const value = try parseJsonValue(allocator, if (text.len == 0) "[]" else text);
     switch (value) {
         .array => |array| {
@@ -215,7 +215,7 @@ pub fn upsertDocument(pg_pool: *pool.Pool, doc: common.DocumentRow, allocator: s
         \\    crawled_at = EXCLUDED.crawled_at,
         \\    updated_at = now()
     , &.{
-        doc.url,
+        doc.url orelse "",
         doc.domain,
         doc.title orelse "",
         doc.author orelse "",
